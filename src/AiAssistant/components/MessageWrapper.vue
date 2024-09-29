@@ -1,58 +1,8 @@
 <template>
   <MessageItem :msg-type="msgType">
-    <template v-for="content in item.content" :key="content.type">
-      <template v-if="content.type === 'images' && msgType === MessageType.USER">
-        <div class="user-img-list">
-          <img src="http://iph.href.lu/48x48?fg=666666&bg=cccccc" alt="" v-for="i in 12" :key="i" />
-        </div>
-      </template>
-      <template v-else>
-        <n-el tag="div" class="content">
-          <div class="carousel-wrapper" v-if="content.type === 'images'">
-            <n-carousel
-              :style="{
-                width: '432px',
-                height: '240px'
-              }"
-              v-model:current-index="curImageIndex"
-              indicator-type="never"
-              :show-arrow="true"
-              :show-dots="false"
-            >
-              <n-carousel-item v-for="image in images" :key="image">
-                <n-image
-                  :src="image"
-                  :style="{
-                    width: '100%',
-                    height: '100%'
-                  }"
-                />
-              </n-carousel-item>
-            </n-carousel>
-            <div class="img-actions">
-              <div class="img-index bg" v-if="images.length > 1">{{ curImageIndex }}/{{ images.length }}</div>
-              <div class="img-op bg">
-                <n-button size="tiny" @click="downloadImg">
-                  <template #icon>
-                    <n-icon name="DownloadSmall">
-                      <Download />
-                    </n-icon>
-                  </template>
-                </n-button>
-                <n-button size="tiny" @click="copyImg">
-                  <template #icon>
-                    <n-icon color="white">
-                      <Copy />
-                    </n-icon>
-                  </template>
-                </n-button>
-              </div>
-            </div>
-          </div>
-          <div class="text" v-if="content.type === 'p'">{{ content.children }}</div>
-        </n-el>
-      </template>
-    </template>
+    <n-el tag="div" class="content">
+      <div class="text">{{ item.content }}</div>
+    </n-el>
   </MessageItem>
 </template>
 
@@ -71,14 +21,7 @@ const props = defineProps({
       return {
         creater: '',
         scene: '',
-        content: [
-          {
-            type: 'images',
-            props: {
-              images: []
-            }
-          }
-        ]
+        content: ''
       }
     }
   }
@@ -87,7 +30,7 @@ const msgItem = computed(() => {
   return props.item.content[0]
 })
 const msgType = computed(() => {
-  return props.item.creater === 'assistant' ? MessageType.ASSISTANT : MessageType.USER
+  return props.item.role === 'assistant' ? MessageType.ASSISTANT : MessageType.USER
 })
 const isUser = computed(() => {
   return msgItem.value.type === 'images' && msgType.value === MessageType.USER

@@ -23,7 +23,7 @@
         <div class="assis-side flex flex-col bg-opacity-50 w-60">
           <div class="assis-header flex justify-between pa-3 b-0 b-b-1 b-coolGray b-solid">
             <div class="left">
-              <span class="title" style="color: var(--n-color-text)">智能AI助手</span>
+              <span class="title" style="color: var(--n-color-text)"></span>
               <n-badge value="New" />
             </div>
             <div class="right">
@@ -37,24 +37,16 @@
               </n-button>
             </div>
           </div>
+          <span>{{ isGeminiAvailable }}</span>
         </div>
       </n-layout-sider>
       <n-layout>
-        <div
-          class="ai-assistant"
-          @drop.prevent="handleDrop"
-          @dragleave.prevent="handleDragleave"
-          @dragover.prevent="handleDragover"
-          @mouseenter="handleMouseEnter"
-          @mouseleave="handleMouseLeave"
-          tabindex="0"
-          ref="assistantRef"
-        >
+        <div class="ai-assistant" tabindex="0" ref="assistantRef">
           <div class="assis-content flex-1 h-100% box-border">
             <div class="assis-chat-list">
               <n-scrollbar ref="scrollRef">
                 <div class="list-wrapper px-16rem py-0" ref="listRef">
-                  <template v-for="(item, index) in mockMessages" :key="index">
+                  <template v-for="(item, index) in msgList" :key="index">
                     <MessageWrapper :item="item" />
                   </template>
                   <MessageItem v-if="isLoading" msg-type="assistant" :is-loading="true" />
@@ -71,7 +63,7 @@
                   v-model:value="userInput"
                   @keydown="handleKeydown"
                 />
-                <n-button theme="primary" circle size="small" class="smaller-button" @click="scrollToBottom">
+                <n-button theme="primary" circle size="small" class="smaller-button" @click="submit">
                   <template #icon>
                     <n-icon>
                       <Send />
@@ -96,6 +88,9 @@
     @negative-click="handleCancel"
   >
     <n-form>
+      <n-form-item label="模型选择">
+        <n-select v-model:value="form.api" />
+      </n-form-item>
       <n-form-item label="API">
         <n-input v-model:value="form.api" />
       </n-form-item>
@@ -107,17 +102,15 @@
 </template>
 
 <script setup lang="ts">
-import {onBeforeMount, onMounted, Ref, ref, unref} from 'vue'
+import {computed, onBeforeMount, onMounted, Ref, ref, unref} from 'vue'
 import MessageItem from './MessageItem.vue'
-import {useMessage, type UploadInst} from 'naive-ui'
-import {DoorExit, Heart, Send, Settings} from '@vicons/tabler'
-import {getOneMessage, mockMessages, useStreamOutput} from '../mock'
+import {useMessage} from 'naive-ui'
+import {Heart, Send, Settings} from '@vicons/tabler'
+import {mockMessages} from '../mock'
 import MessageWrapper from './MessageWrapper.vue'
-import {MessageType} from '../constant/constant'
-import {checkFolder} from '../hook/aiAssistant.hook'
 import {useScroll} from '../hook/scroll.hook'
-import {useTheme} from '../hook/theme.hook'
 import {useDark, useToggle} from '@vueuse/core'
+import {useGemini} from '../hook/gemini.hook'
 const isDark: Ref<boolean> = useDark()
 const toggleDark = useToggle(isDark)
 const collapsed = ref(false)
@@ -137,149 +130,20 @@ function handleCancel() {
   showSetting.value = false
 }
 
-const activeTab = ref('image')
 const msgList = ref<any[]>([])
 const isLoading = ref(false)
-
-function switchToImgTab() {
-  if (activeTab.value === 'text') {
-    activeTab.value = 'image'
-  }
-}
 
 // 列表滚动
 // 发送消息后需要滚动到列表底部
 const {scrollRef, listRef, scrollToBottom} = useScroll()
 
-// 图片上传
-// 图片最大上传数量20张
-const maxUploadCount = 20
-const fileList = ref([
-  {
-    uid: 1,
-    url: 'https://n-private-pre-1312190317.cos.ap-guangzhou.myqcloud.com/houseType/showImg/ht/1833093821305421824/png.1833093821305421824?sign=q-sign-algorithm%3Dsha1%26q-ak%3DAKID1xjaR4Uq4LVSH8xgYN4e8QaXKtEkI4iA%26q-sign-time%3D1725954223%3B1726040623%26q-key-time%3D1725954223%3B1726040623%26q-header-list%3Dhost%26q-url-param-list%3D%26q-signature%3Dd3dbaaf822845f60c6f702b1b9c8930bafb9dc71',
-    name: 'a.webp',
-    status: 'success'
-  },
-  {
-    uid: 2,
-    url: 'https://n-private-pre-1312190317.cos.ap-guangzhou.myqcloud.com/houseType/showImg/ht/1833093821305421824/png.1833093821305421824?sign=q-sign-algorithm%3Dsha1%26q-ak%3DAKID1xjaR4Uq4LVSH8xgYN4e8QaXKtEkI4iA%26q-sign-time%3D1725954223%3B1726040623%26q-key-time%3D1725954223%3B1726040623%26q-header-list%3Dhost%26q-url-param-list%3D%26q-signature%3Dd3dbaaf822845f60c6f702b1b9c8930bafb9dc71',
-    name: 'b.webp',
-    status: 'error'
-  }
-])
-const uploadRef = ref<UploadInst | null>(null)
-const imgUploadRef = ref<HTMLInputElement | null>(null)
-
 // 粘贴处理
 // 浏览器无法读取剪贴板中的多张图片，当剪贴板有多张图片时，getAsFile返回null
 // 鼠标移入移出
 const assistantRef = ref<HTMLDivElement | null>(null)
-const isInAssistant = ref(false)
-function handleMouseEnter() {
-  isInAssistant.value = true
-}
-function handleMouseLeave() {
-  isInAssistant.value = false
-}
-async function handlePaste(e: ClipboardEvent) {
-  if (isInAssistant.value || assistantRef.value!.contains(document.activeElement)) {
-    switchToImgTab()
-    const items = e.clipboardData?.items
-    let file: File | null = null
-    try {
-      if (!items || 0 === items.length) return
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        if (item.type.indexOf('image') !== -1) {
-          file = items[i].getAsFile()
-          break
-        }
-      }
-      console.log(file)
-      if (file) {
-        uploadRef.value?.upload([file])
-      }
-    } catch (error) {}
-  }
-}
-onMounted(() => {
-  document.addEventListener('paste', handlePaste)
-})
-onBeforeMount(() => {
-  document.removeEventListener('paste', handlePaste)
-})
-
-// 图片拖拽上传
-const dragOver = ref(false)
-let dragTimer: NodeJS.Timeout
-async function handleDrop(e: DragEvent) {
-  e.preventDefault()
-  const files: FileList | undefined = e.dataTransfer?.files
-  dragOver.value = false
-  const isFolder = await checkFolder(e)
-  isFolder ? Message.warning('暂不支持文件夹上传') : transferFiles(files)
-}
-function handleDragleave(e) {
-  dragTimer = setTimeout(() => {
-    dragOver.value = false
-  }, 100)
-}
-function handleDragover(e) {
-  clearTimeout(dragTimer)
-  dragOver.value = true
-}
-function uploadFile(e) {
-  imgUploadRef.value?.click()
-}
-function transferFiles(files: FileList | undefined) {
-  if (!files) return
-  if (fileList.value.length + files?.length > maxUploadCount) {
-    Message.warning(`最多上传${maxUploadCount}张图片`)
-  } else if (files && files.length > 0) {
-    switchToImgTab()
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      file.uid = Date.now() + i + ''
-      uploadRef.value?.upload([file])
-    }
-  }
-}
-
-function handleFileChange(e: Event) {
-  const target = e?.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (file) {
-    uploadRef.value?.upload([file])
-  }
-}
-function beforeUpload(file: File) {
-  const typeList = ['png', 'jpg', 'jpeg']
-  return new Promise((resolve, reject) => {
-    if (!typeList.some((type) => file.type.includes(type))) {
-      Message.error('请上传格式为.png,.jpeg,.jpg的图片')
-      reject()
-    }
-    if (file.size > 5242880) {
-      Message.error('文件大小不大于5M')
-      reject()
-    }
-    resolve(true)
-  })
-}
 
 // 文字输入
 const userInput = ref('')
-function handleOp(item, opType: 'add' | 'delete' = 'add') {
-  console.log(item, opType)
-  if (opType === 'add') {
-    if (!userInput.value) {
-      userInput.value = item
-    } else {
-      userInput.value += `、${item}`
-    }
-  }
-}
 
 // shift+enter换行 enter发送
 function handleKeydown(event: KeyboardEvent) {
@@ -295,26 +159,18 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-// 猜你喜欢
-const showLike = ref(false)
-function toggleShowLike() {
-  showLike.value = !showLike.value
-}
-
 // 信息发送
 function submit() {
   if (isLoading.value) {
     Message.warning('智能生成中，请稍后再发送')
     return
   }
-  if (activeTab.value === 'text') {
-    sendTextMsg()
-  }
-  if (activeTab.value === 'image') {
-    sendImgMsg()
-  }
+  sendTextMsg()
 }
-
+const {isAvailable, startSession} = useGemini()
+const isGeminiAvailable = computed(() => {
+  return isAvailable.value ? 'gemini is ready' : 'gemini is not ready'
+})
 // 发送文字
 async function sendTextMsg() {
   if (!userInput.value) {
@@ -327,44 +183,47 @@ async function sendTextMsg() {
     const input = unref(userInput)
     userInput.value = ''
     addUserMsg(input)
-    // 同步非流式
-    // const msg = await getOneMessage(input);
-    // 同步流式调用
-    const {getStreamMessage, ret} = useStreamOutput(isLoading)
-    msgList.value.push(ret)
-    await getStreamMessage(input)
+    const ret = await startSession(unref(input), unref(msgList))
+    addAssistantMsg(ret)
   } catch (error) {
+    console.log(error)
   } finally {
     isLoading.value = false
   }
 }
 
-// 发送图片
-function sendImgMsg() {
-  if (fileList.value.length === 0) {
-    Message.warning('请上传图片')
-    return
-  }
-  scrollToBottom()
-}
-
 // 添加用户消息
-function addUserMsg(msg) {
+function addUserMsg(content: string) {
   const ret = {
     // 创建人
     creater: '火山',
     // 当前消息场景
     scene: '文生图片',
+    role: 'user',
     // 内容
-    content: [
-      {
-        type: 'p',
-        children: msg
-      }
-    ]
+    content
   }
   msgList.value.push(ret)
 }
+
+// 添加assistant消息
+function addAssistantMsg(content: string) {
+  const ret = {
+    // 创建人
+    creater: 'Gemni Nano',
+    // 当前消息场景
+    scene: '文生图片',
+    role: 'assistant',
+    // 内容
+    content
+  }
+  msgList.value.push(ret)
+}
+const a = [{"creater":"火山","scene":"文生图片","role":"user","content":"hello"},
+{"creater":"Gemni Nano","scene":"文生图片","role":"assistant","content":" Hello!"},
+{"creater":"火山","scene":"文生图片","role":"user","content":"create a web page use vue 3 with vue SFC"},
+{"creater":"Gemni Nano","scene":"文生图片","role":"assistant","content":" ```html\n<!-- src/App.vue -->\n<template>\n  <div>\n    <h1>{{ this.$router.breadCrumb }}</div>\n    <router-view/>\n  </div>\n</template>\n\n<script>\nimport Vue from 'vue';\nimport VueRouter from 'vue-router';\nimport Vuex from 'vuex';\nimport VuexSession from 'vuex-session';\n\nVue.use(VueRouter);\nVue.use(Vuex);\nVue.use(VuexSession);\n\nconst store = new Vuex.Store({\n  state: {\n    count: 0\n  },\n  mutations: {\n    increment (state) {\n      state.count++;\n    }\n  }\n});\n\nconst router = new VueRouter({\n  routes: [\n    { path: '/', component: App },\n    { path: '/about', component: About }\n  ]\n});\n\nnew Vue({\n  router,\n  store,\n  render: h => h(App)\n}).$mount('#app');\n</script>\n```"}
+]
 </script>
 
 <style scoped lang="scss">
