@@ -1,23 +1,21 @@
 <script setup lang="ts">
-import {darkTheme, lightTheme} from 'naive-ui'
-import {useDark, useToggle} from '@vueuse/core'
+import {darkTheme, lightTheme, useThemeVars} from 'naive-ui'
 import {computed, type Ref} from 'vue'
 import AiAssistant from './AiAssistant/components/AiAssistant.vue'
-
-const isDark = useDark()
-const toggleDark = useToggle(isDark)
-
+import {useTheme} from './AiAssistant/hook/theme.hook'
+const {isDark} = useTheme()
+const themeVars = useThemeVars()
 const curTheme = computed(() => {
   return isDark.value ? darkTheme : lightTheme
 })
 </script>
 
 <template>
-  <!-- <n-config-provider :theme="curTheme"> -->
-  <n-message-provider>
-    <AiAssistant />
-  </n-message-provider>
-  <!-- </n-config-provider> -->
+  <n-config-provider :theme="curTheme">
+    <n-message-provider>
+      <AiAssistant :style="themeVars" />
+    </n-message-provider>
+  </n-config-provider>
 </template>
 
 <style scoped></style>

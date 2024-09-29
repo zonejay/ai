@@ -1,76 +1,141 @@
 <template>
-  <div
-    class="ai-assistant flex bg-white"
-    @drop.prevent="handleDrop"
-    @dragleave.prevent="handleDragleave"
-    @dragover.prevent="handleDragover"
-    @mouseenter="handleMouseEnter"
-    @mouseleave="handleMouseLeave"
-    tabindex="0"
-    ref="assistantRef"
-  >
-    <div class="assis-side flex flex-col bg-gray-100 bg-opacity-50 w-60">
-      <div class="assis-header flex justify-between pa-3 b-0 b-b-1 b-coolGray b-solid">
-        <div class="left">
-          <span class="title text-black">智能AI助手</span>
-          <n-badge value="New" />
-        </div>
-        <div class="right">
-          <n-button strong secondary circle size="small">
-            <template #icon>
-              <n-icon>
-                <DoorExit />
-              </n-icon>
-            </template>
-          </n-button>
-        </div>
-      </div>
-    </div>
-
-    <div class="assis-content flex-1">
-      <div class="assis-chat-list">
-        <n-scrollbar ref="scrollRef">
-          <div class="list-wrapper px-16rem py-0" ref="listRef">
-            <template v-for="(item, index) in mockMessages" :key="index">
-              <MessageWrapper :item="item" />
-            </template>
-            <MessageItem v-if="isLoading" msg-type="assistant" :is-loading="true" />
-            <div class="last-div" style="height: 12px"></div>
+  <n-space vertical>
+    <n-layout has-sider style="height: 100vh">
+      <n-layout-sider
+        bordered
+        collapse-mode="width"
+        :collapsed-width="64"
+        :width="240"
+        :collapsed="collapsed"
+        show-trigger
+        @collapse="collapsed = true"
+        @expand="collapsed = false"
+      >
+        <!-- <n-menu
+          :collapsed="collapsed"
+          :collapsed-width="64"
+          :collapsed-icon-size="22"
+          :options="menuOptions"
+          :render-label="renderMenuLabel"
+          :render-icon="renderMenuIcon"
+          :expand-icon="expandIcon"
+        /> -->
+        <div class="assis-side flex flex-col bg-opacity-50 w-60">
+          <div class="assis-header flex justify-between pa-3 b-0 b-b-1 b-coolGray b-solid">
+            <div class="left">
+              <span class="title" style="color: var(--n-color-text)">智能AI助手</span>
+              <n-badge value="New" />
+            </div>
+            <div class="right">
+              <n-button @click="toggleDark()">切换主题{{ isDark }}</n-button>
+              <n-button strong secondary circle size="small" @click="showSetting = true">
+                <template #icon>
+                  <n-icon>
+                    <Settings />
+                  </n-icon>
+                </template>
+              </n-button>
+            </div>
           </div>
-        </n-scrollbar>
-      </div>
-      <div class="assis-footer p-x-20 box-border">
-        <div class="text-input">
-          <n-input
-            type="textarea"
-            placeholder="请输入精装风格及要求，如：北欧风格含大理石背景墙"
-            :auto-size="{maxRows: 11}"
-            v-model:value="userInput"
-            @keydown="handleKeydown"
-          />
-          <n-button theme="primary" circle size="mini" class="smaller-button" @click="scrollToBottom">
-            <template #icon>
-              <n-icon name="BackTop" color="white" />
-            </template>
-          </n-button>
         </div>
-      </div>
-    </div>
-  </div>
+      </n-layout-sider>
+      <n-layout>
+        <div
+          class="ai-assistant"
+          @drop.prevent="handleDrop"
+          @dragleave.prevent="handleDragleave"
+          @dragover.prevent="handleDragover"
+          @mouseenter="handleMouseEnter"
+          @mouseleave="handleMouseLeave"
+          tabindex="0"
+          ref="assistantRef"
+        >
+          <div class="assis-content flex-1 h-100% box-border">
+            <div class="assis-chat-list">
+              <n-scrollbar ref="scrollRef">
+                <div class="list-wrapper px-16rem py-0" ref="listRef">
+                  <template v-for="(item, index) in mockMessages" :key="index">
+                    <MessageWrapper :item="item" />
+                  </template>
+                  <MessageItem v-if="isLoading" msg-type="assistant" :is-loading="true" />
+                  <div class="last-div" style="height: 12px"></div>
+                </div>
+              </n-scrollbar>
+            </div>
+            <div class="assis-footer w-66% box-border">
+              <div class="text-input">
+                <n-input
+                  type="textarea"
+                  placeholder="请输入精装风格及要求，如：北欧风格含大理石背景墙"
+                  :auto-size="{maxRows: 11}"
+                  v-model:value="userInput"
+                  @keydown="handleKeydown"
+                />
+                <n-button theme="primary" circle size="small" class="smaller-button" @click="scrollToBottom">
+                  <template #icon>
+                    <n-icon>
+                      <Send />
+                    </n-icon>
+                  </template>
+                </n-button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </n-layout>
+    </n-layout>
+  </n-space>
+  <!-- 设置llm api 和 key -->
+  <n-modal
+    v-model:show="showSetting"
+    preset="dialog"
+    title="设置"
+    positive-text="保存"
+    negative-text="取消"
+    @positive-click="handleSave"
+    @negative-click="handleCancel"
+  >
+    <n-form>
+      <n-form-item label="API">
+        <n-input v-model:value="form.api" />
+      </n-form-item>
+      <n-form-item label="Key">
+        <n-input v-model:value="form.key" type="password" show-password-on="click" />
+      </n-form-item>
+    </n-form>
+  </n-modal>
 </template>
 
 <script setup lang="ts">
-import {onBeforeMount, onMounted, ref, unref} from 'vue'
+import {onBeforeMount, onMounted, Ref, ref, unref} from 'vue'
 import MessageItem from './MessageItem.vue'
 import {useMessage, type UploadInst} from 'naive-ui'
-import {DoorExit, Heart} from '@vicons/tabler'
+import {DoorExit, Heart, Send, Settings} from '@vicons/tabler'
 import {getOneMessage, mockMessages, useStreamOutput} from '../mock'
 import MessageWrapper from './MessageWrapper.vue'
 import {MessageType} from '../constant/constant'
 import {checkFolder} from '../hook/aiAssistant.hook'
 import {useScroll} from '../hook/scroll.hook'
+import {useTheme} from '../hook/theme.hook'
+import {useDark, useToggle} from '@vueuse/core'
+const isDark: Ref<boolean> = useDark()
+const toggleDark = useToggle(isDark)
+const collapsed = ref(false)
 
 const Message = useMessage()
+
+const form = ref({
+  api: '',
+  key: ''
+})
+const showSetting = ref(false)
+function handleSave() {
+  console.log(form.value)
+}
+function handleCancel() {
+  console.log('cancel')
+  showSetting.value = false
+}
 
 const activeTab = ref('image')
 const msgList = ref<any[]>([])
@@ -338,7 +403,7 @@ function addUserMsg(msg) {
 
   .assis-content {
     display: flex;
-    padding: var(--spacing-l, 12px) var(--spacing-l, 12px) 20px var(--spacing-l, 12px);
+    padding: 12px 0;
     flex-direction: column;
     align-items: center;
     flex: 1;
@@ -364,15 +429,11 @@ function addUserMsg(msg) {
 
     .assis-footer {
       position: relative;
-      width: 100%;
       .select-input-type {
         z-index: 2;
         position: absolute;
         top: 0px;
         right: 0px;
-      }
-      :deep(.n-tabs-rail) {
-        @apply w-48;
       }
       .text-input {
         display: flex;
@@ -382,7 +443,6 @@ function addUserMsg(msg) {
         margin: 1px;
         border: 1px solid transparent;
         border-radius: var(--border-radius-default, 4px);
-        background: var(--fill-color-lighter-6, #f5f5f5);
         transition: color 0.1s cubic-bezier(0, 0, 1, 1), border-color 0.1s cubic-bezier(0, 0, 1, 1),
           background-color 0.1s cubic-bezier(0, 0, 1, 1);
 
@@ -405,10 +465,6 @@ function addUserMsg(msg) {
         }
         &:focus-within {
           border: 1px solid var(--primary-color-default, #7055ff);
-          background: var(--fill-color-white, #fff);
-          .n-textarea-wrapper {
-            background: var(--fill-color-white, #fff);
-          }
         }
       }
 

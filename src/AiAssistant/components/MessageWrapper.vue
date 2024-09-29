@@ -7,7 +7,7 @@
         </div>
       </template>
       <template v-else>
-        <div class="content">
+        <n-el tag="div" class="content">
           <div class="carousel-wrapper" v-if="content.type === 'images'">
             <n-carousel
               :style="{
@@ -34,7 +34,7 @@
               <div class="img-op bg">
                 <n-button size="tiny" @click="downloadImg">
                   <template #icon>
-                    <n-icon name="DownloadSmall" color="white">
+                    <n-icon name="DownloadSmall">
                       <Download />
                     </n-icon>
                   </template>
@@ -50,7 +50,7 @@
             </div>
           </div>
           <div class="text" v-if="content.type === 'p'">{{ content.children }}</div>
-        </div>
+        </n-el>
       </template>
     </template>
   </MessageItem>
@@ -156,10 +156,10 @@ async function copyImg() {
   padding: 8px var(--spacing-l, 12px);
 
   border-radius: var(--border-radius-default, 4px);
-  background: var(--fill-color-lighter-6, #f5f5f5);
+
+  background-color: var(--card-color);
 
   .text {
-    color: var(--text-color-default, #191919);
     text-align: justify;
     font-family: 'PingFang SC';
     font-size: 14px;

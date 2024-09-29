@@ -1,22 +1,24 @@
 <template>
   <div class="message-item">
-    <div class="message-header">
+    <div class="message-header" :style="{justifyContent: msgType === MessageType.USER ? 'flex-end' : 'flex-start'}">
       <template v-if="msgType === MessageType.USER">
-        <n-icon color="black">
+        <n-icon>
           <User />
         </n-icon>
-        <span class="user-name text-black">用户</span>
       </template>
       <template v-else>
         <img class="assistant-img" src="/vite.svg" />
-        <span class="user-name text-black">{{ systemName }}</span>
         <span class="loading-text" v-if="isLoading">
           智能生成中
           <span class="dot">...</span>
         </span>
       </template>
     </div>
-    <slot v-if="!isLoading"></slot>
+    <div class="w-100% flex" :class="msgType === MessageType.USER ? 'justify-end' : 'justify-start'">
+      <div class="max-w-72%">
+        <slot v-if="!isLoading"></slot>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -45,6 +47,8 @@ const props = defineProps({
 </script>
 
 <style scoped lang="scss">
+.message-item {
+}
 .message-header {
   display: flex;
   padding-bottom: 8px;
